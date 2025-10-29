@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../app/app.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -40,13 +41,12 @@ class _RegisterPageState extends State<RegisterPage>
     super.dispose();
   }
 
+  // ✅ При успешной регистрации переходим в MyApp
   void _onRegister() {
     if (_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Регистрация успешна (заглушка)'),
-          backgroundColor: Colors.green,
-        ),
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MyApp()),
       );
     }
   }
@@ -150,9 +150,7 @@ class _RegisterPageState extends State<RegisterPage>
                   children: [
                     const Text("Уже есть аккаунт? "),
                     TextButton(
-                      onPressed: () {
-                        // TODO: переход на login
-                      },
+                      onPressed: _onRegister, // просто переход в MyApp
                       child: const Text(
                         "Войти",
                         style: TextStyle(
