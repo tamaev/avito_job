@@ -23,8 +23,15 @@ class AvitoJobApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Avito Job',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: const RegisterPage(), //
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        scaffoldBackgroundColor: Colors.white,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.blueAccent,
+          foregroundColor: Colors.white,
+        ),
+      ),
+      home: const RegisterPage(), // Начальная страница
     );
   }
 }

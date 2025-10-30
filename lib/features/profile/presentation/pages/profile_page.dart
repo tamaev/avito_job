@@ -15,6 +15,8 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   String userName = 'Иван Иванов';
   String userEmail = 'ivan@example.com';
+  String userGender = 'Не указан';
+  String? userBirthDate;
   String? userImagePath;
   bool isDarkTheme = false;
 
@@ -29,6 +31,8 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() {
       userName = prefs.getString('userName') ?? 'Иван Иванов';
       userEmail = prefs.getString('userEmail') ?? 'ivan@example.com';
+      userGender = prefs.getString('userGender') ?? 'Не указан';
+      userBirthDate = prefs.getString('userBirthDate');
       userImagePath = prefs.getString('userImagePath');
       isDarkTheme = prefs.getBool('isDarkTheme') ?? false;
     });
@@ -38,9 +42,9 @@ class _ProfilePageState extends State<ProfilePage> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('userName', userName);
     await prefs.setString('userEmail', userEmail);
-    if (userImagePath != null) {
-      await prefs.setString('userImagePath', userImagePath!);
-    }
+    await prefs.setString('userGender', userGender);
+    if (userBirthDate != null) await prefs.setString('userBirthDate', userBirthDate!);
+    if (userImagePath != null) await prefs.setString('userImagePath', userImagePath!);
   }
 
   Future<void> _pickImage() async {
@@ -53,19 +57,40 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(2000),
+      firstDate: DateTime(1950),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() => userBirthDate = "${picked.day}.${picked.month}.${picked.year}");
+      final prefs = await SharedPreferences.getInstance();
+      prefs.setString('userBirthDate', userBirthDate!);
+    }
+  }
+
   void _editProfile() {
     String newName = userName;
     String newEmail = userEmail;
+    String newGender = userGender;
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (context) {
         return Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            top: 16,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -76,12 +101,24 @@ class _ProfilePageState extends State<ProfilePage> {
               TextField(
                 decoration: const InputDecoration(labelText: 'Имя'),
                 controller: TextEditingController(text: userName),
+                maxLength: 22,
                 onChanged: (value) => newName = value,
               ),
               TextField(
                 decoration: const InputDecoration(labelText: 'Email'),
                 controller: TextEditingController(text: userEmail),
+                maxLength: 22,
                 onChanged: (value) => newEmail = value,
+              ),
+              DropdownButtonFormField<String>(
+                value: newGender,
+                items: const [
+                  DropdownMenuItem(value: 'Не указан', child: Text('Не указан')),
+                  DropdownMenuItem(value: 'Мужской', child: Text('Мужской')),
+                  DropdownMenuItem(value: 'Женский', child: Text('Женский')),
+                ],
+                onChanged: (value) => newGender = value ?? 'Не указан',
+                decoration: const InputDecoration(labelText: 'Пол'),
               ),
               const SizedBox(height: 12),
               ElevatedButton(
@@ -89,6 +126,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   setState(() {
                     userName = newName;
                     userEmail = newEmail;
+                    userGender = newGender;
                   });
                   _saveProfileData();
                   Navigator.pop(context);
@@ -125,7 +163,7 @@ class _ProfilePageState extends State<ProfilePage> {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const RegisterPage()),
-            (route) => false, // полностью очищает стек
+            (route) => false,
       );
     }
   }
@@ -169,11 +207,18 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 16),
               Text(
                 userName,
-                style:
-                const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               Text(userEmail, style: const TextStyle(color: Colors.grey)),
+              const SizedBox(height: 8),
+              Text("Пол: $userGender"),
+              Text("Дата рождения: ${userBirthDate ?? 'Не указана'}"),
               const SizedBox(height: 30),
+              ListTile(
+                leading: const Icon(Icons.cake),
+                title: const Text('Указать дату рождения'),
+                onTap: _pickDate,
+              ),
               ListTile(
                 leading: const Icon(Icons.edit),
                 title: const Text('Редактировать профиль'),
@@ -187,9 +232,8 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
-                title:
-                const Text('Выйти', style: TextStyle(color: Colors.red)),
-                onTap: _logout, //
+                title: const Text('Выйти', style: TextStyle(color: Colors.red)),
+                onTap: _logout,
               ),
             ],
           ),

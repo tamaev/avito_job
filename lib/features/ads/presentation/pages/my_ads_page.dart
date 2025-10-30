@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../chat/presentation/pages/chat_page.dart';
 import '../models/ad_model.dart';
 
@@ -10,7 +13,7 @@ class MyAdsPage extends StatefulWidget {
 }
 
 class _MyAdsPageState extends State<MyAdsPage> {
-  final List<AdModel> myAds = [];
+  List<AdModel> myAds = [];
 
   final List<String> templateImages = [
     'https://avatars.dzeninfra.ru/get-zen_doc/271828/pub_6874fa66ef09bd32e52bfdc6_6874fa9ad97ee50e8a71517b/scale_1200',
@@ -20,6 +23,29 @@ class _MyAdsPageState extends State<MyAdsPage> {
     'https://cdn0.youla.io/files/images/780_780/63/5f/635f946748f96668540cdf84-1.jpg',
     'https://avatars.mds.yandex.net/get-mpic/5234821/img_id4009715928955772149.jpeg/orig',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAds();
+  }
+
+  Future<void> _loadAds() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? savedAds = prefs.getString('my_ads');
+    if (savedAds != null) {
+      final List decoded = jsonDecode(savedAds);
+      setState(() {
+        myAds = decoded.map((e) => AdModel.fromJson(e)).toList();
+      });
+    }
+  }
+
+  Future<void> _saveAds() async {
+    final prefs = await SharedPreferences.getInstance();
+    final encoded = jsonEncode(myAds.map((e) => e.toJson()).toList());
+    await prefs.setString('my_ads', encoded);
+  }
 
   void _addNewAd() {
     showModalBottomSheet(
@@ -55,23 +81,39 @@ class _MyAdsPageState extends State<MyAdsPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
+
+                    // Название товара
                     TextField(
-                      decoration:
-                      const InputDecoration(labelText: 'Название товара'),
+                      decoration: const InputDecoration(
+                        labelText: 'Название товара (до 22 символов)',
+                      ),
+                      inputFormatters: [
+                        LengthLimitingTextInputFormatter(22),
+                      ],
                       onChanged: (value) => title = value,
                     ),
+
+                    // Цена
                     TextField(
-                      decoration:
-                      const InputDecoration(labelText: 'Цена (₽)'),
+                      decoration: const InputDecoration(
+                        labelText: 'Цена (₽)',
+                      ),
                       keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(7),
+                      ],
                       onChanged: (value) => price = value,
                     ),
+
                     const SizedBox(height: 12),
                     const Text(
                       'Выберите фото:',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 8),
+
+                    // Выбор изображения
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -110,7 +152,10 @@ class _MyAdsPageState extends State<MyAdsPage> {
                         );
                       }).toList(),
                     ),
+
                     const SizedBox(height: 16),
+
+                    // Добавить
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blueAccent,
@@ -118,23 +163,33 @@ class _MyAdsPageState extends State<MyAdsPage> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      onPressed: () {
-                        if (title.isNotEmpty &&
-                            price.isNotEmpty &&
-                            selectedImage != null) {
-                          setState(() {
-                            myAds.add(AdModel(
-                              id: DateTime.now().millisecondsSinceEpoch,
-                              title: title,
-                              description: 'Новое объявление пользователя',
-                              imageUrl: selectedImage!,
-                              price: int.tryParse(price) ?? 0,
-                              location: 'Москва',
-                              seller: 'Продавец',
-                            ));
-                          });
-                          Navigator.pop(context);
+                      onPressed: () async {
+                        if (title.isEmpty || price.isEmpty || selectedImage == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Заполните все поля'),
+                              backgroundColor: Colors.redAccent,
+                            ),
+                          );
+                          return;
                         }
+
+                        final newAd = AdModel(
+                          id: DateTime.now().millisecondsSinceEpoch,
+                          title: title,
+                          description: 'Новое объявление пользователя',
+                          imageUrl: selectedImage!,
+                          price: int.tryParse(price) ?? 0,
+                          location: 'Москва',
+                          seller: 'Продавец',
+                        );
+
+                        setState(() {
+                          myAds.add(newAd);
+                        });
+
+                        await _saveAds();
+                        Navigator.pop(context);
                       },
                       child: const Text('Добавить'),
                     ),
@@ -148,10 +203,11 @@ class _MyAdsPageState extends State<MyAdsPage> {
     );
   }
 
-  void _removeAd(AdModel ad) {
+  Future<void> _removeAd(AdModel ad) async {
     setState(() {
       myAds.remove(ad);
     });
+    await _saveAds();
   }
 
   @override
@@ -159,9 +215,7 @@ class _MyAdsPageState extends State<MyAdsPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Мои объявления')),
       body: myAds.isEmpty
-          ? const Center(
-        child: Text('У вас пока нет объявлений'),
-      )
+          ? const Center(child: Text('У вас пока нет объявлений'))
           : ListView.builder(
         padding: const EdgeInsets.all(8),
         itemCount: myAds.length,

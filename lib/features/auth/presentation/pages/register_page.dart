@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../app/app.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -8,47 +9,77 @@ class RegisterPage extends StatefulWidget {
   State<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _RegisterPageState extends State<RegisterPage>
-    with SingleTickerProviderStateMixin {
+class _RegisterPageState extends State<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
 
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
+  bool _isLoading = false;
 
-  @override
-  void initState() {
-    super.initState();
+  Future<void> _register() async {
+    if (!_formKey.currentState!.validate()) return;
 
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..forward();
+    setState(() => _isLoading = true);
 
-    _fadeAnimation =
-        CurvedAnimation(parent: _animationController, curve: Curves.easeIn);
+    final prefs = await SharedPreferences.getInstance();
+    final savedEmail = prefs.getString('userEmail');
+    final savedPassword = prefs.getString('userPassword');
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    // Если пользователь уже зарегистрирован
+    if (savedEmail == email) {
+      _showMessage("Пользователь уже зарегистрирован");
+    } else {
+      await prefs.setString('userEmail', email);
+      await prefs.setString('userPassword', password);
+      _showMessage("Регистрация успешна!");
+    }
+
+    setState(() => _isLoading = false);
   }
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
-    _animationController.dispose();
-    super.dispose();
-  }
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
 
-  // ✅ При успешной регистрации переходим в MyApp
-  void _onRegister() {
-    if (_formKey.currentState!.validate()) {
+    setState(() => _isLoading = true);
+
+    final prefs = await SharedPreferences.getInstance();
+    final savedEmail = prefs.getString('userEmail');
+    final savedPassword = prefs.getString('userPassword');
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (savedEmail == null || savedPassword == null) {
+      _showMessage("Пользователь не зарегистрирован");
+    } else if (savedEmail != email) {
+      _showMessage("Пользователь не зарегистрирован");
+    } else if (savedPassword != password) {
+      _showMessage("Неверный пароль");
+    } else {
+      // успешный вход
+      _showMessage("Успешный вход!");
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const MyApp()),
       );
     }
+
+    setState(() => _isLoading = false);
+  }
+
+  void _showMessage(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text),
+        backgroundColor: Colors.blueAccent,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   InputDecoration _inputDecoration(String label, IconData icon) {
@@ -76,93 +107,102 @@ class _RegisterPageState extends State<RegisterPage>
         elevation: 0,
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.blueAccent,
-        title: const Text(
-          "Создать аккаунт",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: const Text("Регистрация / Вход"),
         centerTitle: true,
       ),
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                const Icon(Icons.shopping_bag,
-                    size: 80, color: Colors.blueAccent),
-                const SizedBox(height: 24),
-                TextFormField(
-                  controller: _emailController,
-                  decoration: _inputDecoration("Email", Icons.email),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) =>
-                  (value == null || value.isEmpty) ? "Введите email" : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: _inputDecoration("Пароль", Icons.lock),
-                  obscureText: true,
-                  validator: (value) => (value == null || value.length < 6)
-                      ? "Минимум 6 символов"
-                      : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _confirmPasswordController,
-                  decoration:
-                  _inputDecoration("Повторите пароль", Icons.lock_outline),
-                  obscureText: true,
-                  validator: (value) =>
-                  value != _passwordController.text
-                      ? "Пароли не совпадают"
-                      : null,
-                ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueAccent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 6,
-                      shadowColor: Colors.blueAccent.withOpacity(0.4),
-                    ),
-                    onPressed: _onRegister,
-                    child: const Text(
-                      "Зарегистрироваться",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              const Icon(Icons.shopping_bag, size: 80, color: Colors.blueAccent),
+              const SizedBox(height: 24),
+              TextFormField(
+                controller: _emailController,
+                maxLength: 30,
+                decoration: _inputDecoration("Email", Icons.email),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return "Введите email";
+                  } else if (value.length > 30) {
+                    return "Не более 30 символов";
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _passwordController,
+                maxLength: 30,
+                decoration: _inputDecoration("Пароль", Icons.lock),
+                obscureText: true,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return "Введите пароль";
+                  } else if (value.length > 30) {
+                    return "Не более 30 символов";
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _confirmPasswordController,
+                maxLength: 30,
+                decoration: _inputDecoration("Повторите пароль", Icons.lock_outline),
+                obscureText: true,
+                validator: (value) {
+                  if (value != _passwordController.text) {
+                    return "Пароли не совпадают";
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 32),
+              if (_isLoading)
+                const CircularProgressIndicator()
+              else
+                Column(
                   children: [
-                    const Text("Уже есть аккаунт? "),
-                    TextButton(
-                      onPressed: _onRegister, // просто переход в MyApp
-                      child: const Text(
-                        "Войти",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blueAccent,
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blueAccent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        onPressed: _register,
+                        child: const Text(
+                          "Зарегистрироваться",
+                          style: TextStyle(fontSize: 18, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          side: const BorderSide(color: Colors.blueAccent, width: 2),
+                        ),
+                        onPressed: _login,
+                        child: const Text(
+                          "Войти",
+                          style: TextStyle(fontSize: 18, color: Colors.blueAccent),
                         ),
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
+            ],
           ),
         ),
       ),
